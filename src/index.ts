@@ -114,8 +114,22 @@ function writeAuthTokens(registries: string[], token: string): void {
   }
 
   const tmp = `${target}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, ini.stringify(cfg), { mode: 0o600 });
-  fs.renameSync(tmp, target);
+  const contents = ini.stringify(cfg);
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(tmp, "w", 0o600);
+    fs.writeSync(fd, contents);
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmp, target);
+  } catch (e) {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* ignore close errors during cleanup */ }
+    }
+    try { fs.unlinkSync(tmp); } catch { /* ignore cleanup errors */ }
+    throw e;
+  }
   try { fs.chmodSync(target, 0o600); } catch { /* no-op on Windows */ }
 }
 
