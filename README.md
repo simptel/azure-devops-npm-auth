@@ -11,7 +11,7 @@ Replaces Personal Access Tokens with short-lived tokens that refresh automatical
 npm install -g @simptel/azure-devops-npm-auth
 ```
 
-Requires Node.js 22+.
+Requires Node.js 22.9.0+.
 
 ---
 
