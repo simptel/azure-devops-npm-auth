@@ -1,7 +1,7 @@
 {
   "name": "@simptel/azure-devops-npm-auth",
-  "version": "1.0.0",
-  "description": "Local-dev Entra ID auth for Azure DevOps npm feeds. Replaces PATs.",
+  "version": "1.1.0",
+  "description": "Local development Microsoft Entra ID auth for Azure DevOps npm feeds and replaces Personal Access Tokens.",
   "main": "dist/index.js",
   "bin": {
     "azure-devops-npm-auth": "dist/index.js"
@@ -14,8 +14,9 @@
     "url": "git+https://github.com/simptel/azure-devops-npm-auth.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "public"
+    "registry": "https://registry.npmjs.org",
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "tsc",
