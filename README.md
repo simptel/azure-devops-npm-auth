@@ -1,81 +1,63 @@
 # azure-devops-npm-auth
 
 Authenticate `npm` with Azure DevOps Artifacts using Microsoft Entra ID.
-Replaces Personal Access Tokens (PATs) with short-lived tokens.
-
----
-
-## Prerequisites
-
-Register an OAuth2 app in Microsoft Entra ID:
-
-1. Entra admin center → **App registrations** → **New registration**
-2. **Supported account types**: Single tenant
-3. **Redirect URI**: leave empty (device code flow doesn't use one)
-4. After creation → **Authentication** → enable **Allow public client flows**
-5. **API permissions** → **Add a permission** → **Azure DevOps** → **Delegated** → `vso.packaging` (and `vso.packaging_write` if publishing)
-6. Grant admin consent
-7. Copy the **Application (client) ID** and **Directory (tenant) ID** from the Overview page
+Replaces Personal Access Tokens with short-lived tokens that refresh automatically.
 
 ---
 
 ## Install
 
 ```bash
-npm install -g azure-devops-npm-auth
+npm install -g @simptel/azure-devops-npm-auth
 ```
+
+Requires Node.js 22+.
 
 ---
 
 ## Usage
 
-Run in a project with an Azure DevOps `.npmrc`:
+First run (in a project with an Azure DevOps `.npmrc`):
 
 ```bash
 azure-devops-npm-auth --tenant-id <tenant-id> --client-id <client-id>
 ```
 
-On first run:
+Prints a device code, opens a browser to sign in, stores the session in your OS keychain, and writes a token to `~/.npmrc`.
 
-* Opens browser for sign-in
-* Stores auth session securely in OS keychain
-* Writes access token to `~/.npmrc`
-
-Subsequent runs:
+After that, just run:
 
 ```bash
 azure-devops-npm-auth
 ```
 
-Runs silently and refreshes tokens when needed.
+It silently refreshes the token from the cached session. Safe to run before every `npm install`.
+
+You can also set `AZDO_TENANT_ID` and `AZDO_CLIENT_ID` instead of passing flags. Run `azure-devops-npm-auth --help` for all options.
 
 ---
 
 ## Features
 
-* Entra ID authentication (no PATs)
-* Automatic token refresh
-* Multi-registry support
-* Works with existing `.npmrc`
-* Safe to run before every `npm install`
+- No PATs — uses Entra ID device code flow
+- Tokens auto-refresh (~1h lifetime)
+- Multi-registry support
+- Credentials stored in OS keychain (Keychain / DPAPI / libsecret)
 
 ---
 
-## How it works
+## Setup
 
-* Uses Entra ID to obtain an access token for Azure DevOps
-* Stores session securely via OS credential storage (Keychain / DPAPI / libsecret)
-* Writes short-lived token to `~/.npmrc` for npm usage
+An admin registers an Entra app once:
 
----
-
-## Notes
-
-* Tokens expire (~1 hour) and are refreshed automatically
-* Requires an Entra app registration with `vso.packaging` permission
+1. **App registrations → New registration** — single tenant, no redirect URI
+2. **Authentication →** enable *Allow public client flows*
+3. **API permissions → Add → Azure DevOps → Delegated →** `vso.packaging` (add `vso.packaging_write` for publishing)
+4. **Grant admin consent**
+5. Share the **Application (client) ID** and **Directory (tenant) ID** with developers
 
 ---
 
 ## License
 
-MIT License
+MIT

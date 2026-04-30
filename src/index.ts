@@ -4,12 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import * as ini from "ini";
 import { parseArgs } from "util";
-import {
-  ChainedTokenCredential,
-  AzureCliCredential,
-  DeviceCodeCredential,
-  useIdentityPlugin,
-} from "@azure/identity";
+import { DeviceCodeCredential, useIdentityPlugin } from "@azure/identity";
 import { cachePersistencePlugin } from "@azure/identity-cache-persistence";
 
 useIdentityPlugin(cachePersistencePlugin);
@@ -22,7 +17,21 @@ const AZDO_SCOPE = "499b84ac-1321-427f-aa17-267ca6975798/.default";
 const ALLOWED_HOST = "pkgs.dev.azure.com";
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-interface Config { tenantId: string; clientId: string; cwd: string; }
+const HELP = `Usage: azure-devops-npm-auth [options]
+
+  --tenant-id <guid>         Entra tenant ID         (env: AZDO_TENANT_ID)
+  --client-id <guid>         Entra app client ID     (env: AZDO_CLIENT_ID)
+  --project-base-path <dir>  Project root with .npmrc (default: cwd)
+  -h, --help                 Show this help
+
+Reads Azure DevOps registry URLs from <project>/.npmrc, acquires a token
+via Entra device code flow, and writes _authToken entries to ~/.npmrc.`;
+
+interface Config {
+  tenantId: string;
+  clientId: string;
+  cwd: string;
+}
 
 function parseConfig(): Config {
   const { values } = parseArgs({
@@ -30,14 +39,20 @@ function parseConfig(): Config {
       "tenant-id":         { type: "string" },
       "client-id":         { type: "string" },
       "project-base-path": { type: "string" },
+      "help":              { type: "boolean", short: "h" },
     },
-    strict: false,
-    allowPositionals: true,
+    strict: true,
+    allowPositionals: false,
   });
 
-  const tenantId = (values["tenant-id"] as string | undefined) ?? process.env.AZDO_TENANT_ID;
-  const clientId = (values["client-id"] as string | undefined) ?? process.env.AZDO_CLIENT_ID;
-  const cwd = path.resolve((values["project-base-path"] as string | undefined) ?? process.cwd());
+  if (values.help) {
+    console.log(HELP);
+    process.exit(0);
+  }
+
+  const tenantId = values["tenant-id"] ?? process.env.AZDO_TENANT_ID;
+  const clientId = values["client-id"] ?? process.env.AZDO_CLIENT_ID;
+  const cwd = path.resolve(values["project-base-path"] ?? process.cwd());
 
   if (!tenantId || !GUID.test(tenantId)) {
     throw new Error("Missing or invalid --tenant-id (or AZDO_TENANT_ID). Must be a GUID.");
@@ -74,22 +89,24 @@ function findRegistries(cwd: string): string[] {
   return [...found];
 }
 
-async function acquireToken({ tenantId, clientId }: Config): Promise<string> {
-  const cred = new ChainedTokenCredential(
-    new AzureCliCredential({ tenantId }),
-    new DeviceCodeCredential({
-      tenantId,
-      clientId,
-      tokenCachePersistenceOptions: {
-        enabled: true,
-        name: `azure-devops-npm-auth-${tenantId}`,
-        unsafeAllowUnencryptedStorage: false,
-      },
-    }),
-  );
+interface AcquiredToken {
+  value: string;
+  expiresOn: Date;
+}
+
+async function acquireToken({ tenantId, clientId }: Config): Promise<AcquiredToken> {
+  const cred = new DeviceCodeCredential({
+    tenantId,
+    clientId,
+    tokenCachePersistenceOptions: {
+      enabled: true,
+      name: `azure-devops-npm-auth-${tenantId}`,
+      unsafeAllowUnencryptedStorage: false,
+    },
+  });
   const result = await cred.getToken(AZDO_SCOPE);
   if (!result?.token) throw new Error("Failed to acquire access token.");
-  return result.token;
+  return { value: result.token, expiresOn: new Date(result.expiresOnTimestamp) };
 }
 
 function userNpmrcPath(): string {
@@ -133,12 +150,21 @@ function writeAuthTokens(registries: string[], token: string): void {
   try { fs.chmodSync(target, 0o600); } catch { /* no-op on Windows */ }
 }
 
+function formatExpiry(expiresOn: Date): string {
+  const minutes = Math.max(0, Math.round((expiresOn.getTime() - Date.now()) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 async function main(): Promise<void> {
   const config = parseConfig();
   const registries = findRegistries(config.cwd);
   const token = await acquireToken(config);
-  writeAuthTokens(registries, token);
+  writeAuthTokens(registries, token.value);
   for (const r of registries) console.log(`✓ ${r}`);
+  console.log(`Token valid for ${formatExpiry(token.expiresOn)}`);
 }
 
 main().catch((e) => {
