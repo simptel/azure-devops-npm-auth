@@ -25,7 +25,8 @@ const HELP = `Usage: azure-devops-npm-auth [options]
   -h, --help                 Show this help
 
 Reads Azure DevOps registry URLs from <project>/.npmrc, acquires a token
-via Entra device code flow, and writes _authToken entries to ~/.npmrc.`;
+via Entra device code flow, and writes _authToken entries to the user .npmrc
+(~/.npmrc by default).`;
 
 interface Config {
   tenantId: string;
