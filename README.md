@@ -23,7 +23,7 @@ First run (in a project with an Azure DevOps `.npmrc`):
 azure-devops-npm-auth --tenant-id <tenant-id> --client-id <client-id>
 ```
 
-Prints a device code, opens a browser to sign in, stores the session in your OS keychain, and writes a token to `~/.npmrc`.
+Prints a device code, opens a browser to sign in, stores the session in your OS keychain, and writes a token to the npm user config file (`$npm_config_userconfig` if set, otherwise `~/.npmrc`).
 
 After that, just run:
 
